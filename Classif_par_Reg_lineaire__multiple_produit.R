@@ -1,4 +1,10 @@
-#Projet/Produit
+
+####Entête####
+##Fichier : Classif_par_Reg_lineaire__multiple_produit.R
+##Desc : Toutes les instructions relatives au Projet/Produit
+## Produit Critauto - M2 SEP - 2022-2023
+##Date : 30/10/22
+##Auteur : Hélène NOVAKOWSKI (helene.novakowski@etudiant.univ-reims.fr)
 
 
 #vider la mémoire
