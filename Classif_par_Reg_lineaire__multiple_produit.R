@@ -21,7 +21,6 @@ library(MASS)
 library(glmnet)
 
 
-
 ## Importation du fichier
 CO2 <- read.csv2("bdd_CO2.csv", stringsAsFactors=TRUE)
 
