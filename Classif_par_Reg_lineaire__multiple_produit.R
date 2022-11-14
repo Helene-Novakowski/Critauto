@@ -460,9 +460,6 @@ print(pvalue) #on obtient 0, le modèle optimal est très significatif
 
 
 
-
-
-
 #################################################################################################
 
 #### Erreurs de classification, évaluées par validation croisées, 
@@ -470,7 +467,7 @@ print(pvalue) #on obtient 0, le modèle optimal est très significatif
 #et pour le modèle complet utilisant les quatre variables #### 
 indices <- 1:nrow(opt.data)
 #la fonction évaluant l'erreur de classification des deux modèles, pour une partition donnée
-err_classif <- function(l = 3){
+err_classif <- function(l){
   #on partage le tableau en deux parties : par exemple (l-1)/l pour apprentissage et 1/l pour le test
   indices.ensemble.test <- sample(indices, trunc(length(indices)/l), replace = FALSE)
   ensemble.test <- opt.data[indices.ensemble.test, ]
@@ -670,78 +667,101 @@ summary(data_co2$var_co2)
 
 
 
-
 #################################################################################
 #Utilisation#
-################################################################################################################"
-
-
-
-
-
-# metrics.confusion_matrix(y_true, y_pred)
-
-
-summary(modele.forward)
-# (Intercept) conso_urb conso_exurb cod_cbrGO lib_mrqMERCEDES cod_cbrFE `gammeMOY-INFER` lib_mrqLEXUS `typ_boite_nb_rappA 6`
+#################################################################################
+coef_reg <-summary(modele.forward)$coefficients
+#        (Intercept) conso_urb conso_exurb cod_cbrGO lib_mrqMERCEDES cod_cbrFE `gammeMOY-INFER` lib_mrqLEXUS `typ_boite_nb_rappA 6`
 # forte    -2861.1348  134.0892   209.01258 331.76214       21.134494 -175.0205       11.2490080   -40.200460              -4.625905
 # moyenne   -324.3317   20.0975    33.55833  35.92446        2.682887 -216.3935       -0.1897904     7.889877               3.122098
 
-V_conso_urb = 15
-V_conso_exurb = 7
+V_conso_urb = 11.2
+V_conso_exurb = 6.8
 V_cod_cbrGO = 0   #Attention si 1 GO alors 0 FE
-V_lib_mrqLEXUS = 1   #Attention si 1 alors aux autres !
+V_lib_mrqLEXUS = 0   #Attention si 1 alors aux autres !
 V_lib_mrqMERCEDES = 0
-V_cod_cbrFE =  1
-V_gammeMOY_INFER = 1
+V_cod_cbrFE =  0
+V_gammeMOY_INFER = 0
 V_typ_boite_nb_rappA_6 = 0
 
-forte = -2861.1348 + 134.0892*V_conso_urb + 209.01258*V_conso_exurb + 331.76214*V_cod_cbrGO + 21.134494*V_lib_mrqMERCEDES - 175.0205*V_cod_cbrFE + 11.2490080*V_gammeMOY_INFER - 40.200460*V_lib_mrqLEXUS - 4.625905*V_typ_boite_nb_rappA_6
-
-moyenne = -324.3317 + 20.0975*V_conso_urb + 33.55833*V_conso_exurb + 35.92446*V_cod_cbrGO + 2.682887*V_lib_mrqMERCEDES - 216.3935*V_cod_cbrFE - 0.1897904*V_gammeMOY_INFER + 7.889877*V_lib_mrqLEXUS + 3.122098*V_typ_boite_nb_rappA_6
-
-#Pollution = Faible / Moyenne / Forte
-
-Pfaible = 1/(1+exp(forte)+ exp(moyenne))            #proba Y=faible conditionnellement au var explicaive
-Pforte = exp(forte)/(1+exp(forte)+ exp(moyenne))    #proba Y=forte conditionnellement au var explicaive
-Pmoy = exp(moyenne)/(1+exp(forte)+ exp(moyenne))    #proba Y=forte conditionnellement au var explicaive
-
-#prendre la proba max
-maxi = max(Pfaible, Pforte, Pmoy)
-
-
-# Proba = c(Pfaible, Pforte, Pmoy)
-if (Pfaible == maxi) {
-  Proba = "Pfaible"
-} else if (Pforte == maxi) {
-          Proba = "Pforte"
-       } else {
-          Proba = "Pmoy"
-}
-Proba  #nous donne le statut de pollution du new vehicule
-
-
-
-
-
-
-
-
-
-
-
-
+res_classif_par_reg_logi <- function(V_conso_urb, V_conso_exurb, V_cod_cbrGO, 
+                                     V_lib_mrqMERCEDES, V_cod_cbrFE, V_gammeMOY_INFER, 
+                                     V_lib_mrqLEXUS, V_typ_boite_nb_rappA_6){
+  
+  forte = coef_reg[[1]]+coef_reg[[3]]*V_conso_urb + coef_reg[[5]]*V_conso_exurb 
+  + coef_reg[[7]]*V_cod_cbrGO + coef_reg[[9]]*V_lib_mrqMERCEDES + coef_reg[[11]]*V_cod_cbrFE 
+  + coef_reg[[13]]*V_gammeMOY_INFER + coef_reg[[15]]*V_lib_mrqLEXUS + coef_reg[[17]]*V_typ_boite_nb_rappA_6
+  
+  moyenne = coef_reg[[2]] + coef_reg[[4]]*V_conso_urb + coef_reg[[6]]*V_conso_exurb 
+  + coef_reg[[8]]*V_cod_cbrGO + coef_reg[[10]]*V_lib_mrqMERCEDES + coef_reg[[12]]*V_cod_cbrFE 
+  + coef_reg[[14]]*V_gammeMOY_INFER + coef_reg[[16]]*V_lib_mrqLEXUS + coef_reg[[18]]*V_typ_boite_nb_rappA_6
+  
+  #Pollution = Faible / Moyenne / Forte
+  
+  Pfaible = 1/(1+exp(forte)+ exp(moyenne))            #proba Y=faible conditionnellement au var explicaive
+  Pforte = exp(forte)/(1+exp(forte)+ exp(moyenne))    #proba Y=forte conditionnellement au var explicaive
+  Pmoy = exp(moyenne)/(1+exp(forte)+ exp(moyenne))    #proba Y=forte conditionnellement au var explicaive
+  
+  #prendre la proba max
+  maxi = max(Pfaible, Pforte, Pmoy, na.rm=TRUE)
+  
+  
+  # Proba = c(Pfaible, Pforte, Pmoy)
+  if (Pfaible == maxi) {
+    Proba = "faible"
+  } else if (Pforte == maxi) {
+    Proba = "forte"
+  } else {
+    Proba = "moyenne"
+  }
+  
+  return(Proba)
+}  #nous donne le statut de pollution du new vehicule
 
 
+print(res_classif_par_reg_logi(V_conso_urb, V_conso_exurb, V_cod_cbrGO, 
+                               V_lib_mrqLEXUS, V_lib_mrqMERCEDES, V_cod_cbrFE, 
+                               V_gammeMOY_INFER, V_typ_boite_nb_rappA_6)) 
 
 
 
 
-#Créer un doc exérieur VBA
-proba = 2
-dump(list = "proba", file = "proba.txt")
 
 
+
+#____________________________________________________________________________________
+
+# plot(modele.forward, dat)
+
+
+# barplot(sort(variables.classees2, decreasing = TRUE))
+# barplot(sort(var.imp, decreasing = TRUE)[1:10], names.arg=rownames(var.imp)[ord][1:10], cex.names=0.6)
+
+
+#_________________________________________________________________________________
+# modele.forward
+
+
+View(base_Test)
+str(base_Test)
+
+base_Test %>% 
+  mutate(vehi = 1:nrow(base_Test)) %>% 
+  group_by(vehi) %>% 
+  mutate(predi = res_classif_par_reg_logi(conso_urb[1], conso_exurb[1], cod_cbrGO[1], lib_mrqMERCEDES[1], 
+                                          cod_cbrFE[1], `gammeMOY-INFER`[1], lib_mrqLEXUS[1], `typ_boite_nb_rappA 6`[1])) %>% 
+  dplyr::select(var_co2, predi) -> base_pred
+
+
+# describe(base_Test)#define vectors of actual values and predicted values
+actual <- factor(base_Test$var_co2)
+pred <- factor(base_pred$predi)
+
+
+library(caret)
+#F score
+table(actual, pred)
+confusionMatrix(pred, actual, mode = "everything", positive="1") 
 
 
 
