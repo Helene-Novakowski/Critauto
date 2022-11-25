@@ -190,6 +190,36 @@ data_co2 <- cbind(as.data.frame(XX), var_co2 = as.factor(data_co2[,"var_co2"])) 
 
 
 
+###Echantillonnage sur les moyennes et fortes#### Pour homogénéisé la variable cible pollution dans notre base
+
+set.seed(12345) #Fixer le générateur
+
+forte <- sample_n(data.frame(subset(data_co2, var_co2 == "forte")), 3613)
+forte
+nrow(forte)
+moyenne <- sample_n(data.frame(subset(data_co2, var_co2 == "moyenne")), 3613)
+moyenne
+nrow(moyenne)
+faible <- data.frame(subset(data_co2, var_co2 == "faible"))
+faible
+nrow(faible)
+
+Co2data <- rbind(forte,moyenne,faible)
+view(Co2data) 
+
+#On créé une base de données pour créer notre modèle puis une autre pour classifier
+Co2data1 <- Co2data[sample(nrow(Co2data)),]
+set.seed(5678)
+perm <- sample(10839,8000)
+data_co2 <- Co2data1[perm,] #échantillon d'apprentissage
+base_Test <- Co2data1[-perm,] #échantillon de validation
+
+
+# unique(base_Test$var_co2)
+
+# summary(base_Test$var_co2)
+#On va travailler sur la base train pour 
+
 
 # Nous avons un grand nombre de variable explicatives
 #Nous allons faire une pré- sélection avec le lasso avant d'utiliser des méthodes de sélection de modèle
@@ -219,26 +249,26 @@ indices <- !(coef(reg.cvlasso)[[2]]  == 0)
 indices.var.select <- indices[2:length(indices)]
 #les variables explicatives sélectionnées par le lasso
 noms.var.lasso <- colnames(data_co2[, !(colnames(data_co2) == "var_co2")])[indices.var.select]
-# "lib_mrqCADILLAC"                "lib_mrqLEXUS"                   "lib_mrqMERCEDES"               
-# [4] "lib_mrqNISSAN"                  "cod_cbrFE"                      "cod_cbrGO"                     
-# [7] "puiss_admin_98"                 "typ_boite_nb_rappA 6"           "typ_boite_nb_rappA 9"          
-# [10] "typ_boite_nb_rappV 0"           "conso_urb"                      "conso_exurb"                   
-# [13] "CarrosserieBREAK"               "CarrosserieTS TERRAINS/CHEMINS" "gammeLUXE"                     
-# [16] "gammeMOY-INFER"                 "gammeSUPERIEURE"                "hc_nox"
+noms.var.lasso
+# "lib_mrqLEXUS"                   "lib_mrqSUBARU"                  "cod_cbrFE"                      "cod_cbrGO"                     
+# [5] "puiss_admin_98"                 "typ_boite_nb_rappA.5"           "typ_boite_nb_rappA.6"           "typ_boite_nb_rappA.9"          
+# [9] "conso_urb"                      "conso_exurb"                    "CarrosserieTS.TERRAINS.CHEMINS" "gammeLUXE"                     
+# [13] "hc_nox"  
+
 ncol(data_co2)
 # 18 var explicatives sur 100
 
 data_co2 %>% 
-  dplyr::select(lib_mrqCADILLAC, lib_mrqLEXUS, lib_mrqMERCEDES, lib_mrqNISSAN, cod_cbrFE, cod_cbrGO, puiss_admin_98,
-                `typ_boite_nb_rappA 6`, `typ_boite_nb_rappA 9`, `typ_boite_nb_rappV 0`, conso_urb, conso_exurb,
-                CarrosserieBREAK, `CarrosserieTS TERRAINS/CHEMINS`, gammeLUXE, `gammeMOY-INFER`, gammeSUPERIEURE, hc_nox, var_co2) -> co2.data2
+  dplyr::select(lib_mrqLEXUS, lib_mrqSUBARU, cod_cbrFE, cod_cbrGO, puiss_admin_98,
+                typ_boite_nb_rappA.5, typ_boite_nb_rappA.6, typ_boite_nb_rappA.9, conso_urb, conso_exurb,
+                CarrosserieTS.TERRAINS.CHEMINS, gammeLUXE, hc_nox, var_co2) -> co2.data2
 
 # co2.data2 <- data_co2[, noms.var.lasso]
 # co2.data2 <- as.data.frame(cbind(co2.data2, var_co2 = data_co2$var_co2))
 ncol(co2.data2)
 str(co2.data2)
 
-View(co2.data2)
+# View(co2.data2)
 summary(co2.data2)
 # colnames(co2.data)
 
@@ -263,9 +293,7 @@ attributes(modele.complet)
 modele.complet$edf #donne le nombre de paramètres du modèle de RegLogMultinomial
 formula(modele.complet$model)
 
-# var_co2 ~ `typ_boite_nb_rappA 5` + `typ_boite_nb_rappA 6` + conso_exurb + 
-#   CarrosserieCOMBISPACE + CarrosserieMINIBUS + `CarrosserieTS TERRAINS/CHEMINS` + 
-#   gammeLUXE
+
 
 modele.trivial <- multinom(formula = var_co2 ~ 1, data = co2.data2, model = TRUE, maxit = 3000)
 print(modele.trivial)
@@ -290,9 +318,8 @@ modele.back
 formula(modele.back$model) #le modèle optimal obtenu
 
 #le meilleur modèle est
-# var_co2 ~ lib_mrqLEXUS + lib_mrqMERCEDES + cod_cbrFE + cod_cbrGO + 
-#   `typ_boite_nb_rappA 6` + conso_urb + conso_exurb + CarrosserieBREAK + 
-#   `CarrosserieTS TERRAINS/CHEMINS` + gammeLUXE + `gammeMOY-INFER`
+# var_co2 ~ lib_mrqLEXUS + cod_cbrFE + cod_cbrGO + puiss_admin_98 + 
+#   conso_urb + conso_exurb + CarrosserieTS.TERRAINS.CHEMINS + hc_nox
 
 
 #la méthode forward selection
@@ -304,10 +331,8 @@ formula(modele.forward$model) #le modèle optimal obtenu
 
 #on cherche la var qui fait baisser le + le critère AIC
 # on a le modèle :
-# var_co2 ~ conso_urb + conso_exurb + cod_cbrGO + lib_mrqMERCEDES + 
-#   cod_cbrFE + `gammeMOY-INFER` + lib_mrqLEXUS + `typ_boite_nb_rappA 6` + 
-#   `CarrosserieTS TERRAINS/CHEMINS` + CarrosserieBREAK + gammeLUXE
-
+# var_co2 ~ conso_exurb + conso_urb + cod_cbrGO + cod_cbrFE + puiss_admin_98 + 
+#   CarrosserieTS.TERRAINS.CHEMINS + lib_mrqLEXUS + hc_nox
 
 
 #la méthode bidirectional elimination / combine backward et forward
@@ -318,9 +343,8 @@ modele.bidirect.elim
 formula(modele.bidirect.elim$model) #le modèle optimal obtenu
 
 # on a le modèle:
-# lib_mrqLEXUS + lib_mrqMERCEDES + cod_cbrFE + cod_cbrGO + 
-#   `typ_boite_nb_rappA 6` + conso_urb + conso_exurb + CarrosserieBREAK + 
-#   `CarrosserieTS TERRAINS/CHEMINS` + gammeLUXE + `gammeMOY-INFER`
+# var_co2 ~ lib_mrqLEXUS + cod_cbrFE + cod_cbrGO + puiss_admin_98 + 
+#   conso_urb + conso_exurb + CarrosserieTS.TERRAINS.CHEMINS + hc_nox
 
 #la méthode bidirectional selection / on commence par le modèle trivial, ascendante
 modele.bidirect.select <- step(object = modele.trivial,
@@ -330,9 +354,8 @@ modele.bidirect.select
 formula(modele.bidirect.select$model) #le modèle optimal obtenu
 
 # Modèle 
-# var_co2 ~ conso_urb + conso_exurb + cod_cbrGO + lib_mrqMERCEDES + 
-#   cod_cbrFE + `gammeMOY-INFER` + lib_mrqLEXUS + `typ_boite_nb_rappA 6` + 
-#   `CarrosserieTS TERRAINS/CHEMINS` + CarrosserieBREAK + gammeLUXE
+# var_co2 ~ conso_exurb + conso_urb + cod_cbrGO + cod_cbrFE + puiss_admin_98 + 
+  # CarrosserieTS.TERRAINS.CHEMINS + lib_mrqLEXUS + hc_nox
 
 #les 4 algorithmes précédents donne le même modèle  complet!
 
@@ -349,9 +372,8 @@ modele.back
 formula(modele.back$model) #le modèle optimal obtenu
 
 # Modèle
-# var_co2 ~ lib_mrqLEXUS + lib_mrqMERCEDES + cod_cbrFE + cod_cbrGO + 
-#   `typ_boite_nb_rappA 6` + conso_urb + conso_exurb + CarrosserieBREAK + 
-#   `CarrosserieTS TERRAINS/CHEMINS` + gammeLUXE + `gammeMOY-INFER`
+# var_co2 ~ lib_mrqLEXUS + cod_cbrFE + cod_cbrGO + puiss_admin_98 + 
+#   conso_urb + conso_exurb + CarrosserieTS.TERRAINS.CHEMINS + hc_nox
 
 
 #la méthode forward selection
@@ -360,11 +382,10 @@ modele.forward <- step(object = modele.trivial,
                        direction = "forward", k = log(n))
 modele.forward
 formula(modele.forward$model) 
+summary(modele.forward)$coefficients
 
 #le modèle optimal obtenu
-# AIC=558.87
-# var_co2 ~ conso_urb + conso_exurb + cod_cbrGO + lib_mrqMERCEDES + 
-#   cod_cbrFE + `gammeMOY-INFER` + lib_mrqLEXUS + `typ_boite_nb_rappA 6`
+# var_co2 ~ conso_exurb + conso_urb + cod_cbrGO + cod_cbrFE + puiss_admin_98 + CarrosserieTS.TERRAINS.CHEMINS
 
 #la méthode bidirectional elimination
 modele.bidirect.elim <- step(object = modele.complet,
@@ -374,9 +395,8 @@ modele.bidirect.elim
 formula(modele.bidirect.elim$model) #le modèle optimal obtenu
 
 # Modèle :
-# var_co2 ~ lib_mrqLEXUS + lib_mrqMERCEDES + cod_cbrFE + cod_cbrGO + 
-#   `typ_boite_nb_rappA 6` + conso_urb + conso_exurb + CarrosserieBREAK + 
-#   `CarrosserieTS TERRAINS/CHEMINS` + gammeLUXE + `gammeMOY-INFER`
+# var_co2 ~ lib_mrqLEXUS + cod_cbrFE + cod_cbrGO + puiss_admin_98 + 
+#   conso_urb + conso_exurb + CarrosserieTS.TERRAINS.CHEMINS + hc_nox
 
 #la méthode bidirectional selection
 modele.bidirect.select <- step(object = modele.trivial,
@@ -385,10 +405,9 @@ modele.bidirect.select <- step(object = modele.trivial,
 modele.bidirect.select
 formula(modele.bidirect.select$model) #le modèle optimal obtenu
 
-# var_co2 ~ conso_urb + conso_exurb + cod_cbrGO + lib_mrqMERCEDES + 
-#   cod_cbrFE + `gammeMOY-INFER` + lib_mrqLEXUS + `typ_boite_nb_rappA 6`
+# var_co2 ~ conso_exurb + conso_urb + cod_cbrGO + cod_cbrFE + puiss_admin_98 + CarrosserieTS.TERRAINS.CHEMINS
 
-# Les deux critères AIC et BIC donne le même modèle. (à l'exception du BIC selection)
+# Les deux critères AIC et BIC donne le même modèle à 8 variables, à l'exception du BIC selection à 6 variables
 
 
 
@@ -404,13 +423,14 @@ formula(modele.bidirect.select$model) #le modèle optimal obtenu
 
 # View(data_co2)
 # ncol(data_co2)
-#pour le modèle complet à 11 variables
+#pour le modèle complet à 8 variables
 data_co2 %>%
-  dplyr::select(var_co2, conso_urb, conso_exurb, cod_cbrGO, lib_mrqMERCEDES, 
-                cod_cbrFE, `gammeMOY-INFER`, lib_mrqLEXUS, `typ_boite_nb_rappA 6`,
-                `CarrosserieTS TERRAINS/CHEMINS`, CarrosserieBREAK, gammeLUXE) -> opt.data
+  dplyr::select(var_co2, conso_exurb, conso_urb, cod_cbrGO, cod_cbrFE, puiss_admin_98,
+                  CarrosserieTS.TERRAINS.CHEMINS, lib_mrqLEXUS, hc_nox) -> opt.data
 View(opt.data)
 ncol(opt.data)
+
+
 
 #### Test de validité du modèle global : H_0 : w_2 = w_3 = (0,0,0) ####
 modele <-  multinom(formula = var_co2 ~  ., data = opt.data, maxit = 3000)  #déviance du modèle global
@@ -419,7 +439,6 @@ modele.reduit <- multinom(formula = var_co2 ~ 1, data = opt.data, maxit = 3000) 
 Sn <- modele.reduit$deviance-modele$deviance #la statistique du rapport de vraisemblance
 print(Sn) #51287.8
 d <- modele$edf - modele.reduit$edf  #donne le n ddl de la loi du chi2 asymptotique de la stat Sn
-#nb de paramère du modèle, 3 var +1 + 2 modalité donc 8 -2=6
 #d différence des 2 dimensions (=nb de paramètre)
 
 pvalue <- pchisq(q = Sn, df = d, lower.tail = F)
@@ -433,8 +452,7 @@ print(pvalue) #on obtient 0, le modèle optimal est très significatif
 #pour le modèle exception à 8 variables
 
 data_co2 %>%
-  dplyr::select(var_co2, conso_urb, conso_exurb, cod_cbrGO, lib_mrqMERCEDES, 
-                cod_cbrFE, `gammeMOY-INFER`, lib_mrqLEXUS, `typ_boite_nb_rappA 6`) -> opt.data2
+  dplyr::select(var_co2, conso_exurb, conso_urb, cod_cbrGO, cod_cbrFE, puiss_admin_98, CarrosserieTS.TERRAINS.CHEMINS) -> opt.data2
 View(opt.data2)
 ncol(opt.data2)
 # opt.data2 <- data.frame(co2.data2)
@@ -446,7 +464,6 @@ modele.reduit <- multinom(formula = var_co2 ~ 1, data = opt.data2, maxit = 3000)
 Sn <- modele.reduit$deviance-modele$deviance #la statistique du rapport de vraisemblance
 print(Sn) #51287.8
 d <- modele$edf - modele.reduit$edf  #donne le n ddl de la loi du chi2 asymptotique de la stat Sn
-#nb de paramère du modèle, 3 var +1 + 2 modalité donc 8 -2=6
 #d différence des 2 dimensions (=nb de paramètre)
 
 pvalue <- pchisq(q = Sn, df = d, lower.tail = F)
@@ -472,8 +489,7 @@ err_classif <- function(l){
   indices.ensemble.test <- sample(indices, trunc(length(indices)/l), replace = FALSE)
   ensemble.test <- opt.data[indices.ensemble.test, ]
   ensemble.apprentissage <- opt.data[-indices.ensemble.test, ]
-  modele.BIC <- multinom(formula = var_co2 ~ conso_urb + conso_exurb + cod_cbrGO + lib_mrqMERCEDES + 
-                                        cod_cbrFE + `gammeMOY-INFER` + lib_mrqLEXUS + `typ_boite_nb_rappA 6`,
+  modele.BIC <- multinom(formula = var_co2 ~ conso_exurb + conso_urb + cod_cbrGO + cod_cbrFE + puiss_admin_98 + CarrosserieTS.TERRAINS.CHEMINS,
                          data = ensemble.apprentissage, maxit = 3000) # le modèle optimal
   modele.complet <- multinom(formula = var_co2 ~ ., 
                              data = ensemble.apprentissage, maxit = 3000) # le modèle complet
@@ -485,7 +501,7 @@ err_classif <- function(l){
 }  
 # l=3
 print(err_classif(3)) #premier est pour le modèle réduit, l'autre le modèle complet
-# 0.001088576 0.001145869
+ # 0.001375043 0.001145869
 
 #il faut le faire plusieurs fois ici 100
 
@@ -519,10 +535,6 @@ err.classif.modele.BIC - err.classif.modele.complet
 
 
 
-
-
-
-
 #################################################################################
 #var la + significative est celle dont la p-value est la + faible
 ################################################################################################################"
@@ -531,6 +543,7 @@ err.classif.modele.BIC - err.classif.modele.complet
 #### Tester si la variable conso_exurb n'est pas significative dans le modèle : H_0 : w_{2,1} = w_{3,1} = 0 ####
 #H0 la variable x_1 n'est pas significative dans le modèle
 #le modèle réduit exclu la variable x1
+
 modele <-  multinom(formula = var_co2 ~  ., data = opt.data2, maxit = 3000) 
 modele.reduit <- multinom(formula = var_co2 ~ ., 
                           data = opt.data2[, !(colnames(opt.data2)=="conso_exurb")], 
@@ -540,6 +553,8 @@ print(Sn.conso_exurb)
 d <- modele$edf - modele.reduit$edf  #donne le n ddl de la loi du chi2 asymptotique de la stat Sn
 pvalue.conso_exurb <- pchisq(q = Sn.conso_exurb, df = d, lower.tail = F)
 print(pvalue.conso_exurb)
+
+
 
 
 #Tester si la variable conso_urb n'est pas significative : H_0 = w_{2,2} = w_{3,2} = 0
@@ -553,15 +568,7 @@ pvalue.conso_urb <- pchisq(q = Sn.conso_urb, df = d, lower.tail = F)
 print(pvalue.conso_urb)
 
 
-#Tester si la variable `typ_boite_nb_rappA 6` n'est pas significative : H_0 = w_{2,2} = w_{3,2} = 0
-modele.reduit <- multinom(formula = var_co2 ~ ., 
-                          data = opt.data2[, !(colnames(opt.data2)=="typ_boite_nb_rappA 6" )], 
-                          maxit = 2000) #le modèle réduit
-Sn.typ_boite_nb_rappA_6 <- modele.reduit$deviance - modele$deviance
-print(Sn.typ_boite_nb_rappA_6)
-d <- modele$edf - modele.reduit$edf  #donne le n ddl de la loi du chi2 asymptotique de la stat Sn
-pvalue.typ_boite_nb_rappA_6 <- pchisq(q = Sn.typ_boite_nb_rappA_6, df = d, lower.tail = F)
-print(pvalue.typ_boite_nb_rappA_6)
+
 
 #Tester si la variable cod_cbrGO n'est pas significative : H_0 = w_{2,4}=w_{3,4}=0
 modele.reduit <- multinom(formula = var_co2 ~ ., 
@@ -574,28 +581,7 @@ pvalue.cod_cbrGO <- pchisq(q = Sn.cod_cbrGO, df = d, lower.tail = F)
 print(pvalue.cod_cbrGO)
 
 
-#Tester si la variable lib_mrqMERCEDES n'est pas significative : H_0 = w_{2,5}=w_{3,5}=0
-modele.reduit <- multinom(formula = var_co2 ~ ., 
-                          data = opt.data2[, !(colnames(opt.data2)=="lib_mrqMERCEDES")], 
-                          maxit = 2000) #le modèle réduit
-Sn.lib_mrqMERCEDES <- modele.reduit$deviance - modele$deviance
-print(Sn.lib_mrqMERCEDES)
-d <- modele$edf - modele.reduit$edf  #donne le n ddl de la loi du chi2 asymptotique de la stat Sn
-pvalue.lib_mrqMERCEDES <- pchisq(q = Sn.lib_mrqMERCEDES, df = d, lower.tail = F)
-print(pvalue.lib_mrqMERCEDES)
-
-
-#Tester si la variable gammeMOY-INFER n'est pas significative : H_0 = w_{2,5}=w_{3,5}=0
-modele.reduit <- multinom(formula = var_co2 ~ ., 
-                          data = opt.data2[, !(colnames(opt.data2)=="gammeMOY-INFER")], 
-                          maxit = 2000) #le modèle réduit
-Sn.gammeMOY_INFER <- modele.reduit$deviance - modele$deviance
-print(Sn.gammeMOY_INFER)
-d <- modele$edf - modele.reduit$edf  #donne le n ddl de la loi du chi2 asymptotique de la stat Sn
-pvalue.gammeMOY_INFER <- pchisq(q = Sn.gammeMOY_INFER, df = d, lower.tail = F)
-print(pvalue.gammeMOY_INFER)
-
-#Tester si la variable cod_cbrFE n'est pas significative : H_0 = w_{2,5}=w_{3,5}=0
+#Tester si la variable cod_cbrFE n'est pas significative : H_0 = w_{2,4}=w_{3,4}=0
 modele.reduit <- multinom(formula = var_co2 ~ ., 
                           data = opt.data2[, !(colnames(opt.data2)=="cod_cbrFE")], 
                           maxit = 2000) #le modèle réduit
@@ -605,164 +591,80 @@ d <- modele$edf - modele.reduit$edf  #donne le n ddl de la loi du chi2 asymptoti
 pvalue.cod_cbrFE <- pchisq(q = Sn.cod_cbrFE, df = d, lower.tail = F)
 print(pvalue.cod_cbrFE)
 
-#Tester si la variable lib_mrqLEXUS n'est pas significative : H_0 = w_{2,5}=w_{3,5}=0
+
+#Tester si la variable puiss_admin_98 n'est pas significative : H_0 = w_{2,5}=w_{3,5}=0
 modele.reduit <- multinom(formula = var_co2 ~ ., 
-                          data = opt.data2[, !(colnames(opt.data2)=="lib_mrqLEXUS")], 
+                          data = opt.data2[, !(colnames(opt.data2)=="puiss_admin_98")], 
                           maxit = 2000) #le modèle réduit
-Sn.lib_mrqLEXUS <- modele.reduit$deviance - modele$deviance
-print(Sn.lib_mrqLEXUS)
+Sn.puiss_admin_98 <- modele.reduit$deviance - modele$deviance
+print(Sn.puiss_admin_98)
 d <- modele$edf - modele.reduit$edf  #donne le n ddl de la loi du chi2 asymptotique de la stat Sn
-pvalue.lib_mrqLEXUS <- pchisq(q = Sn.lib_mrqLEXUS, df = d, lower.tail = F)
-print(pvalue.lib_mrqLEXUS)
+pvalue.puiss_admin_98 <- pchisq(q = Sn.puiss_admin_98, df = d, lower.tail = F)
+print(pvalue.puiss_admin_98)
 
 
+#Tester si la variable CarrosserieTS.TERRAINS.CHEMINS n'est pas significative : H_0 = w_{2,5}=w_{3,5}=0
+modele.reduit <- multinom(formula = var_co2 ~ ., 
+                          data = opt.data2[, !(colnames(opt.data2)=="CarrosserieTS.TERRAINS.CHEMINS")], 
+                          maxit = 2000) #le modèle réduit
+Sn.CarrosserieTS.TERRAINS.CHEMINS <- modele.reduit$deviance - modele$deviance
+print(Sn.CarrosserieTS.TERRAINS.CHEMINS)
+d <- modele$edf - modele.reduit$edf  #donne le n ddl de la loi du chi2 asymptotique de la stat Sn
+pvalue.CarrosserieTS.TERRAINS.CHEMINS <- pchisq(q = Sn.CarrosserieTS.TERRAINS.CHEMINS, df = d, lower.tail = F)
+print(pvalue.CarrosserieTS.TERRAINS.CHEMINS)
 
 
 
 
 ##+ var significative + Sn est grand
 #### Classer les variables ####
-pvalues <- c(pvalue.conso_exurb, pvalue.conso_urb, pvalue.typ_boite_nb_rappA_6, pvalue.lib_mrqLEXUS,
-             pvalue.cod_cbrGO, pvalue.lib_mrqMERCEDES, pvalue.gammeMOY_INFER, pvalue.cod_cbrFE)
+pvalues <- c(pvalue.conso_exurb, pvalue.conso_urb, pvalue.CarrosserieTS.TERRAINS.CHEMINS,
+             pvalue.cod_cbrGO, pvalue.cod_cbrFE,pvalue.puiss_admin_98)
 length(pvalues)
 names(pvalues) <- colnames(opt.data2[, !(colnames(opt.data2) == "var_co2")])
 variables.classees <- sort(pvalues)
 print(variables.classees) # on obtient le classement suivant :
+# conso_exurb                      conso_urb                      cod_cbrFE 
+# 0.000000e+00                   0.000000e+00                  7.104109e-294 
+# puiss_admin_98 CarrosserieTS.TERRAINS.CHEMINS                      cod_cbrGO 
+# 3.407865e-30                   1.773105e-08                   6.805698e-04
 
 #Et pour Sn
-Sn <- c(Sn.conso_exurb, Sn.conso_urb, Sn.typ_boite_nb_rappA_6, Sn.lib_mrqLEXUS,
-        Sn.cod_cbrGO, Sn.lib_mrqMERCEDES, Sn.gammeMOY_INFER, Sn.cod_cbrFE)
+Sn <- c(Sn.conso_exurb, Sn.conso_urb, Sn.CarrosserieTS.TERRAINS.CHEMINS,
+        Sn.cod_cbrGO, Sn.cod_cbrFE, Sn.puiss_admin_98)
 length(Sn)
 names(Sn) <- colnames(opt.data2[, !(colnames(opt.data2) == "var_co2")])
 variables.classees2 <- rev(sort(Sn))
 print(variables.classees2) # on obtient le classement suivant :
-
+# conso_urb                    conso_exurb                      cod_cbrFE 
+# 3614.97057                     2731.91663                     1349.99869 
+# puiss_admin_98 CarrosserieTS.TERRAINS.CHEMINS                      cod_cbrGO 
+# 135.70293                       35.69590                       14.58516
 
 
 nrow(data_co2)
 # Sans oublier la fréquence d'apparition de ces variables significatives dans notre base 
-summary(data_co2$var_co2)
-# faible   forte moyenne 
-# 3613   32211   16538 
-# 6.9 %  61.5 %   31.5 %
+summary(data_co2$CarrosserieTS.TERRAINS.CHEMINS)
+# data.frame(summ,summ*100/(sum(summ)))
+# faible  2643                33.0375
+# forte   2675                33.4375
+# moyenne 2682                33.5250
 
-# conso_urb              9.395 moy
-# conso_exurb            6.685 moy
-# cod_cbrGO              94,13 %
-# lib_mrqMERCEDES        66,68 %
-# cod_cbrFE              0.00382 %
-# gammeMOY-INFER         62,56 %
-# lib_mrqLEXUS           0.48 %
-# typ_boite_nb_rappA 6   1.26%
-
+# conso_urb              8.2 moy
+# conso_exurb            5.9 moy
+# cod_cbrGO              89.5 %
+# cod_cbrFE              0.0125 %
+# puiss_admin_98         9.4 moy
+# lib_mrqLEXUS           2.8 %
 
 
-
-
-
-
-
-
-
-
-
-
-#################################################################################
-#Utilisation#
-#################################################################################
-coef_reg <-summary(modele.forward)$coefficients
-#        (Intercept) conso_urb conso_exurb cod_cbrGO lib_mrqMERCEDES cod_cbrFE `gammeMOY-INFER` lib_mrqLEXUS `typ_boite_nb_rappA 6`
-# forte    -2861.1348  134.0892   209.01258 331.76214       21.134494 -175.0205       11.2490080   -40.200460              -4.625905
-# moyenne   -324.3317   20.0975    33.55833  35.92446        2.682887 -216.3935       -0.1897904     7.889877               3.122098
-
-V_conso_urb = 11.2
-V_conso_exurb = 6.8
-V_cod_cbrGO = 0   #Attention si 1 GO alors 0 FE
-V_lib_mrqLEXUS = 0   #Attention si 1 alors aux autres !
-V_lib_mrqMERCEDES = 0
-V_cod_cbrFE =  0
-V_gammeMOY_INFER = 0
-V_typ_boite_nb_rappA_6 = 0
-
-res_classif_par_reg_logi <- function(V_conso_urb, V_conso_exurb, V_cod_cbrGO, 
-                                     V_lib_mrqMERCEDES, V_cod_cbrFE, V_gammeMOY_INFER, 
-                                     V_lib_mrqLEXUS, V_typ_boite_nb_rappA_6){
-  
-  forte = coef_reg[[1]]+coef_reg[[3]]*V_conso_urb + coef_reg[[5]]*V_conso_exurb 
-  + coef_reg[[7]]*V_cod_cbrGO + coef_reg[[9]]*V_lib_mrqMERCEDES + coef_reg[[11]]*V_cod_cbrFE 
-  + coef_reg[[13]]*V_gammeMOY_INFER + coef_reg[[15]]*V_lib_mrqLEXUS + coef_reg[[17]]*V_typ_boite_nb_rappA_6
-  
-  moyenne = coef_reg[[2]] + coef_reg[[4]]*V_conso_urb + coef_reg[[6]]*V_conso_exurb 
-  + coef_reg[[8]]*V_cod_cbrGO + coef_reg[[10]]*V_lib_mrqMERCEDES + coef_reg[[12]]*V_cod_cbrFE 
-  + coef_reg[[14]]*V_gammeMOY_INFER + coef_reg[[16]]*V_lib_mrqLEXUS + coef_reg[[18]]*V_typ_boite_nb_rappA_6
-  
-  #Pollution = Faible / Moyenne / Forte
-  
-  Pfaible = 1/(1+exp(forte)+ exp(moyenne))            #proba Y=faible conditionnellement au var explicaive
-  Pforte = exp(forte)/(1+exp(forte)+ exp(moyenne))    #proba Y=forte conditionnellement au var explicaive
-  Pmoy = exp(moyenne)/(1+exp(forte)+ exp(moyenne))    #proba Y=forte conditionnellement au var explicaive
-  
-  #prendre la proba max
-  maxi = max(Pfaible, Pforte, Pmoy, na.rm=TRUE)
-  
-  
-  # Proba = c(Pfaible, Pforte, Pmoy)
-  if (Pfaible == maxi) {
-    Proba = "faible"
-  } else if (Pforte == maxi) {
-    Proba = "forte"
-  } else {
-    Proba = "moyenne"
-  }
-  
-  return(Proba)
-}  #nous donne le statut de pollution du new vehicule
-
-
-print(res_classif_par_reg_logi(V_conso_urb, V_conso_exurb, V_cod_cbrGO, 
-                               V_lib_mrqLEXUS, V_lib_mrqMERCEDES, V_cod_cbrFE, 
-                               V_gammeMOY_INFER, V_typ_boite_nb_rappA_6)) 
-
-
-
-
-
-
-
-#____________________________________________________________________________________
-
-# plot(modele.forward, dat)
-
-
-# barplot(sort(variables.classees2, decreasing = TRUE))
-# barplot(sort(var.imp, decreasing = TRUE)[1:10], names.arg=rownames(var.imp)[ord][1:10], cex.names=0.6)
-
-
-#_________________________________________________________________________________
-# modele.forward
-
-
-View(base_Test)
-str(base_Test)
-
-base_Test %>% 
-  mutate(vehi = 1:nrow(base_Test)) %>% 
-  group_by(vehi) %>% 
-  mutate(predi = res_classif_par_reg_logi(conso_urb[1], conso_exurb[1], cod_cbrGO[1], lib_mrqMERCEDES[1], 
-                                          cod_cbrFE[1], `gammeMOY-INFER`[1], lib_mrqLEXUS[1], `typ_boite_nb_rappA 6`[1])) %>% 
-  dplyr::select(var_co2, predi) -> base_pred
-
-
-# describe(base_Test)#define vectors of actual values and predicted values
-actual <- factor(base_Test$var_co2)
-pred <- factor(base_pred$predi)
-
-
-library(caret)
-#F score
-table(actual, pred)
-confusionMatrix(pred, actual, mode = "everything", positive="1") 
-
+par(mfrow=c(1,1))
+par(mar = c(16, 16, 2, 5))
+barplot(df$variables.classees2,
+        xlab = "Sn",
+        horiz=TRUE,
+        names.arg = c("Consommation urbaine", "Consommation extra urbaine", "Carburant Superéthanol",  "Puissance administrative","Carrosserie TS TERRAINS/CHEMINS", "Carburant Gasoil"),
+        col = "darkred",las=1)
 
 
 

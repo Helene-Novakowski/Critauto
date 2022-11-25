@@ -101,25 +101,6 @@ CO2 %>%
 
 str(CO2_mod)
 colnames(CO2_mod)
-miss <- data.frame(CO2_mod)
-colnames(miss) <- c("la marque", "le type de carburant",
-                    "la puissance administrative","la puissance maximale (en kW)",
-                    "le type de boîte de vitesse et le nombre de rapports",
-                    "consommation urbaine de carburant (en l/100km)",
-                    "consommation extra urbaine de carburant (en l/100km)",
-                    "le résultat d’essai de CO type I",
-                    "les résultats d’essai HC+NOX",
-                    "le résultat d’essai de particules",
-                    "la masse en ordre de marche mini",
-                    "la masse en ordre de marche maxi",
-                    "Carrosserie","gamme",
-                    "Statut de pollution par émission de CO2 (en g/km)")
-# View(miss)
-
-####Données manquantes :
-length(which(is.na(miss)))
-# PlotMiss(miss, main = "Données manquantes")
-#en baton rouge c'est une données manquantes
 
 na.omit(CO2_mod) -> data_co2  #On retire toutes les données manquantes !
 as.factor(data_co2$var_co2) -> data_co2$var_co2
@@ -157,36 +138,52 @@ data_co2 <- cbind(as.data.frame(XX), var_co2 = as.factor(data_co2[,"var_co2"])) 
 
 
 
-data_co2 %>% 
-  dplyr::select(lib_mrqCADILLAC, lib_mrqLEXUS, lib_mrqMERCEDES, lib_mrqNISSAN, cod_cbrFE, cod_cbrGO, puiss_admin_98,
-                `typ_boite_nb_rappA 6`, `typ_boite_nb_rappA 9`, `typ_boite_nb_rappV 0`, conso_urb, conso_exurb,
-                CarrosserieBREAK, `CarrosserieTS TERRAINS/CHEMINS`, gammeLUXE, `gammeMOY-INFER`, gammeSUPERIEURE, hc_nox, var_co2) -> co2.data2
+
+
+
+###Echantillonnage sur les moyennes et fortes#### Pour homogénéisé la variable cible pollution dans notre base
+
+set.seed(12345) #Fixer le générateur
+
+forte <- sample_n(data.frame(subset(data_co2, var_co2 == "forte")), 3613)
+forte
+nrow(forte)
+moyenne <- sample_n(data.frame(subset(data_co2, var_co2 == "moyenne")), 3613)
+moyenne
+nrow(moyenne)
+faible <- data.frame(subset(data_co2, var_co2 == "faible"))
+faible
+nrow(faible)
+
+Co2data <- rbind(forte,moyenne,faible)
+view(Co2data) 
+
+#On créé une base de données pour créer notre modèle puis une autre pour classifier
+#On créé une base de données pour créer notre modèle puis une autre pour classifier
+Co2data1 <- Co2data[sample(nrow(Co2data)),]
+set.seed(5678)
+perm <- sample(10839,8000)
+base_Train <- Co2data1[perm,] #échantillon d'apprentissage
+base_Test <- Co2data1[-perm,] #échantillon de validation
+
+
+unique(base_Test$var_co2)
 
 
 
 
+#Le modèle exception à 6 variables
 
-
-
-
-
-
-
-
-
-
-#pour le modèle exception à 8 variables
-
-data_co2 %>%
-  dplyr::select(var_co2, conso_urb, conso_exurb, cod_cbrGO, lib_mrqMERCEDES, 
-                cod_cbrFE, `gammeMOY-INFER`, lib_mrqLEXUS, `typ_boite_nb_rappA 6`) -> opt.data2
-View(opt.data2)
-ncol(opt.data2)
+base_Train %>%
+  dplyr::select(var_co2, conso_exurb, conso_urb, cod_cbrGO, cod_cbrFE, puiss_admin_98, CarrosserieTS.TERRAINS.CHEMINS) -> base_Train
+View(base_Train)
+ncol(base_Train)
 # opt.data2 <- data.frame(co2.data2)
 
+
 #### Test de validité du modèle global : H_0 : w_2 = w_3 = (0,0,0) ####
-modele <-  multinom(formula = var_co2 ~  ., data = opt.data2, maxit = 3000)  #déviance du modèle global
-modele.reduit <- multinom(formula = var_co2 ~ 1, data = opt.data2, maxit = 3000)  #déviance du modèle réduit
+modele <-  multinom(formula = var_co2 ~  ., data = base_Train, maxit = 3000)  #déviance du modèle global
+modele.reduit <- multinom(formula = var_co2 ~ 1, data = base_Train, maxit = 3000)  #déviance du modèle réduit
 
 Sn <- modele.reduit$deviance-modele$deviance #la statistique du rapport de vraisemblance
 print(Sn) #51287.8
@@ -198,15 +195,6 @@ pvalue <- pchisq(q = Sn, df = d, lower.tail = F)
 print(pvalue) #on obtient 0, le modèle optimal est très significatif
 
 
-
-
-
-
-library(caTools)#séparer la vase en 1 dataset training et 1 test
-#on sépare la base en training 75 % et test 25 %
-split = sample.split(opt.data2$var_co2, SplitRatio = 0.75)
-base_Train = subset(opt.data2, split == TRUE)
-base_Test = subset(opt.data2, split == FALSE)
 
 
 #la fonction multinom() calcule les estimateurs des paramètres,
@@ -245,34 +233,39 @@ formula(modele.forward$model)
 
 
 
+
+
+
+colnames(opt.data2)
+
+
+
+
+
 #################################################################################
 #Utilisation#
 #################################################################################
 coef_reg <-summary(modele.forward)$coefficients
-#        (Intercept) conso_urb conso_exurb cod_cbrGO lib_mrqMERCEDES cod_cbrFE `gammeMOY-INFER` lib_mrqLEXUS `typ_boite_nb_rappA 6`
-# forte    -2861.1348  134.0892   209.01258 331.76214       21.134494 -175.0205       11.2490080   -40.200460              -4.625905
-# moyenne   -324.3317   20.0975    33.55833  35.92446        2.682887 -216.3935       -0.1897904     7.889877               3.122098
+coef_reg
+#         (Intercept) conso_exurb conso_urb cod_cbrGO cod_cbrFE puiss_admin_98 CarrosserieTS.TERRAINS.CHEMINS
+# forte    -1727.0156   140.07263  77.53300 195.33016 -135.1363     -0.8859035                      -5.877645
+# moyenne   -291.5461    32.55356  16.15634  31.60347 -140.0694      0.2805151                      -4.422694
 
 V_conso_urb = 11.2
-V_conso_exurb = 6.8
-V_cod_cbrGO = 0   #Attention si 1 GO alors 0 FE
-V_lib_mrqLEXUS = 0   #Attention si 1 alors aux autres !
-V_lib_mrqMERCEDES = 0
-V_cod_cbrFE =  0
-V_gammeMOY_INFER = 0
-V_typ_boite_nb_rappA_6 = 0
+V_conso_exurb = 8
+V_cod_cbrGO = 1   #Attention si 1 GO alors 0 FE
+V_cod_cbrFE = 0    #Attention si 1 FE alors 0 GO
+V_puiss_admin_98 = 8.6
+V_CarrosserieTS.TERRAINS.CHEMINS = 1
 
-res_classif_par_reg_logi <- function(V_conso_urb, V_conso_exurb, V_cod_cbrGO, 
-                                     V_lib_mrqMERCEDES, V_cod_cbrFE, V_gammeMOY_INFER, 
-                                     V_lib_mrqLEXUS, V_typ_boite_nb_rappA_6){
+res_classif_par_reg_logi <- function(V_conso_urb, V_conso_exurb, V_cod_cbrGO, V_cod_cbrFE,
+                                     V_puiss_admin_98, V_CarrosserieTS.TERRAINS.CHEMINS){
   
-  forte = coef_reg[[1]]+coef_reg[[3]]*V_conso_urb + coef_reg[[5]]*V_conso_exurb 
-  + coef_reg[[7]]*V_cod_cbrGO + coef_reg[[9]]*V_lib_mrqMERCEDES + coef_reg[[11]]*V_cod_cbrFE 
-  + coef_reg[[13]]*V_gammeMOY_INFER + coef_reg[[15]]*V_lib_mrqLEXUS + coef_reg[[17]]*V_typ_boite_nb_rappA_6
+  forte = coef_reg[[1]]+coef_reg[[3]]*V_conso_exurb + coef_reg[[5]]* V_conso_urb + coef_reg[[7]]*V_cod_cbrGO 
+  + coef_reg[[9]]*V_cod_cbrFE + coef_reg[[11]]*V_puiss_admin_98 + coef_reg[13]*V_CarrosserieTS.TERRAINS.CHEMINS
   
-  moyenne = coef_reg[[2]] + coef_reg[[4]]*V_conso_urb + coef_reg[[6]]*V_conso_exurb 
-  + coef_reg[[8]]*V_cod_cbrGO + coef_reg[[10]]*V_lib_mrqMERCEDES + coef_reg[[12]]*V_cod_cbrFE 
-  + coef_reg[[14]]*V_gammeMOY_INFER + coef_reg[[16]]*V_lib_mrqLEXUS + coef_reg[[18]]*V_typ_boite_nb_rappA_6
+  moyenne = coef_reg[[2]] + coef_reg[[4]]*V_conso_exurb + coef_reg[[6]]*V_conso_urb + coef_reg[[8]]*V_cod_cbrGO 
+  + coef_reg[[10]]*V_cod_cbrFE + coef_reg[[12]]*V_puiss_admin_98 + coef_reg[14]*V_CarrosserieTS.TERRAINS.CHEMINS
   
   #Pollution = Faible / Moyenne / Forte
   
@@ -297,9 +290,8 @@ res_classif_par_reg_logi <- function(V_conso_urb, V_conso_exurb, V_cod_cbrGO,
 }  #nous donne le statut de pollution du new vehicule
 
 
-print(res_classif_par_reg_logi(V_conso_urb, V_conso_exurb, V_cod_cbrGO, 
-                               V_lib_mrqLEXUS, V_lib_mrqMERCEDES, V_cod_cbrFE, 
-                               V_gammeMOY_INFER, V_typ_boite_nb_rappA_6)) 
+print(res_classif_par_reg_logi(V_conso_urb, V_conso_exurb, V_cod_cbrGO, V_cod_cbrFE,
+                               V_puiss_admin_98, V_CarrosserieTS.TERRAINS.CHEMINS))
 
 
 
@@ -322,17 +314,20 @@ print(res_classif_par_reg_logi(V_conso_urb, V_conso_exurb, V_cod_cbrGO,
 
 View(base_Test)
 str(base_Test)
+colnames(base_Test)
 
 base_Test %>% 
+  dplyr::select(conso_urb, conso_exurb, cod_cbrGO, cod_cbrFE,
+         puiss_admin_98, CarrosserieTS.TERRAINS.CHEMINS, var_co2) %>% 
   mutate(vehi = 1:nrow(base_Test)) %>% 
   group_by(vehi) %>% 
-  mutate(predi = res_classif_par_reg_logi(conso_urb[1], conso_exurb[1], cod_cbrGO[1], lib_mrqMERCEDES[1], 
-         cod_cbrFE[1], `gammeMOY-INFER`[1], lib_mrqLEXUS[1], `typ_boite_nb_rappA 6`[1])) %>% 
+  mutate(predi = res_classif_par_reg_logi(conso_urb[1], conso_exurb[1], cod_cbrGO[1], cod_cbrFE[1], puiss_admin_98[1], V_CarrosserieTS.TERRAINS.CHEMINS[1])) %>% 
   dplyr::select(var_co2, predi) -> base_pred
 
 
+
 # describe(base_Test)#define vectors of actual values and predicted values
-actual <- factor(base_Test$var_co2)
+actual <- factor(base_pred$var_co2)
 pred <- factor(base_pred$predi)
 
 
